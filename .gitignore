@@ -1,0 +1,46 @@
+# 临时文件和测试数据
+temp/
+政务材料/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# 日志文件
+logs/
+*.log
+
+# 环境配置
+.env
+.venv
+venv/
+ENV/
+
+# 前端
+node_modules/
+
+# IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 运行时文件
+.backend.pid
+.backendmanager.pid
+.user_profile.pid
+.frontend.pid
+
+# 前端依赖文件
+frontend/node_modules/
+backend/test.py

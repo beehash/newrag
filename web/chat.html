@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat问答</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Chat问答</h1>
+        
+        <div class="chat-section">
+            <form id="chat-form">
+                <div class="form-group">
+                    <textarea id="query-input" rows="2" placeholder="请输入您的问题..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <div class="topk-control">
+                        <label for="topk-slider">返回资源数量: <span id="topk-value">5</span></label>
+                        <input type="range" id="topk-slider" min="1" max="10" value="5">
+                    </div>
+                    <button type="submit" class="btn btn-primary">搜索</button>
+                </div>
+            </form>
+            
+            <div id="chat-result" class="chat-result">
+                <!-- 结果将在这里显示 -->
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script type="module" src="js/chat.js"></script>
+</body>
+</html>

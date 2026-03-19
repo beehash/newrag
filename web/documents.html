@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文档管理</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>文档管理</h1>
+        
+        <!-- Tab 导航 -->
+        <div class="tab-container">
+            <button class="tab-btn active" data-tab="upload-tab">文件上传</button>
+            <button class="tab-btn" data-tab="files-tab">文件管理</button>
+        </div>
+        
+        <!-- 上传 Tab -->
+        <div id="upload-tab" class="tab-content active">
+            <div class="upload-section">
+                <h2>上传文件</h2>
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="file-input">选择文件：</label>
+                        <input type="file" id="file-input" name="file">
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">上传</button>
+                    </div>
+                </form>
+                <div id="upload-status" class="status-message"></div>
+            </div>
+        </div>
+        
+        <!-- 文件管理 Tab -->
+        <div id="files-tab" class="tab-content">
+            <div class="files-section">
+                <h2>文件列表</h2>
+                <div id="file-list" class="file-list">
+                    <!-- 文件列表将通过 JavaScript 动态生成 -->
+                    <p class="empty-message">暂无文件</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="js/api.js"></script>
+    <script type="module" src="js/document.js"></script>
+</body>
+</html>

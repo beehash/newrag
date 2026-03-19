@@ -1,0 +1,23 @@
+# Web框架和服务器
+fastapi==0.104.1
+uvicorn==0.24.0.post1
+
+# 文件解析
+pdfplumber==0.10.3
+python-docx==0.8.11
+
+# 向量模型和搜索
+sentence-transformers==2.2.2
+pymilvus>=2.4.4
+rank-bm25==0.2.2
+numpy==1.26.4
+
+# 中文分词
+jieba==0.42.1
+
+# HTTP请求
+requests==2.31.0
+openai==1.13.3
+
+# Python包管理工具
+setuptools>=65.5.0

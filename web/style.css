@@ -1,0 +1,418 @@
+/* 全局样式 */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f5f5f5;
+}
+
+.container {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #2c3e50;
+}
+
+h2 {
+    margin-bottom: 20px;
+    color: #34495e;
+}
+
+/* Tab 样式 */
+.tab-container {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #ddd;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background-color: #f1f1f1;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.tab-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.tab-btn.active {
+    background-color: #fff;
+    border-bottom-color: #3498db;
+    color: #3498db;
+}
+
+.tab-content {
+    display: none;
+    padding: 20px 0;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* 表单样式 */
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+}
+
+.btn-danger {
+    background-color: #e74c3c;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.btn-secondary {
+    background-color: #95a5a6;
+    color: #fff;
+}
+
+.btn-secondary:hover {
+    background-color: #7f8c8d;
+}
+
+/* 状态消息 */
+.status-message {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.status-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* 文件列表 */
+.file-list {
+    margin-top: 20px;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    transition: background-color 0.3s ease;
+}
+
+.file-item:hover {
+    background-color: #f9f9f9;
+}
+
+.file-info {
+    flex: 1;
+    min-width: 0; /* 确保flex子元素能够正确收缩 */
+}
+
+.file-name {
+    font-weight: bold;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-meta {
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.empty-message {
+    text-align: center;
+    color: #666;
+    padding: 20px;
+    font-style: italic;
+}
+
+/* 模态框样式 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 800px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close-btn {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.close-btn:hover,
+.close-btn:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.modal-body {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.markdown-content {
+    white-space: pre-wrap;
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+}
+
+/* Chat页面样式 */
+.chat-section {
+    margin-top: 20px;
+}
+
+.chat-section textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.topk-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.topk-control input[type="range"] {
+    width: 100px;
+}
+
+.chat-result {
+    margin-top: 20px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+}
+
+.intent-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background-color: #f5f5f5;
+}
+
+.intent-section h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #34495e;
+}
+
+.intent-section p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+.result-content {
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.result-resources {
+    margin-top: 20px;
+}
+
+.result-resources h3 {
+    margin-bottom: 10px;
+    color: #34495e;
+}
+
+.resource-item {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 10px;
+}
+
+.resource-item:last-child {
+    border-bottom: none;
+}
+
+.resource-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.resource-content {
+    font-size: 14px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 5px;
+}
+
+.resource-similarity {
+    font-size: 12px;
+    color: #999;
+}
+
+/* 响应式设计 */
+@media (max-width: 600px) {
+    .container {
+        margin: 10px;
+        padding: 15px;
+    }
+    
+    .tab-container {
+        flex-direction: column;
+    }
+    
+    .tab-btn {
+        border-bottom: 1px solid #ddd;
+        border-right: 3px solid transparent;
+        border-bottom: none;
+    }
+    
+    .tab-btn.active {
+        border-right-color: #3498db;
+        border-bottom: none;
+    }
+    
+    .file-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .file-actions {
+        align-self: flex-end;
+    }
+    
+    .modal-content {
+        width: 95%;
+        margin: 20% auto;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .topk-control {
+        width: 100%;
+    }
+    
+    .topk-control input[type="range"] {
+        flex: 1;
+    }
+}
