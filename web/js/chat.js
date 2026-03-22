@@ -79,7 +79,6 @@ async function handleQuery(event) {
             // 解码数据
             const chunk = decoder.decode(value, { stream: true });
             
-            // 分割事件流数据
             const events = chunk.split('\n\n');
             for (const event of events) {
                 if (!event || !event.startsWith('data: ')) continue;
@@ -130,11 +129,17 @@ async function handleQuery(event) {
                                 
                                 const resourceContent = document.createElement('div');
                                 resourceContent.className = 'resource-content';
-                                resourceContent.textContent = resource.content || '无内容';
+                                resourceContent.textContent = resource.text || '无内容';
                                 
                                 const resourceSimilarity = document.createElement('div');
                                 resourceSimilarity.className = 'resource-similarity';
-                                resourceSimilarity.textContent = '';//`相似度: ${Math.round((resource.similarity || 0) * 100)}%`;
+                                let similarity = 0;
+                                if (resource.similarity) {
+                                    similarity = Math.round((resource.similarity || 0) * 100) + '%';
+                                } else {
+                                    similarity = resource._similarity || 0;
+                                }
+                                resourceSimilarity.textContent = `匹配度: ${similarity}`;
                                 
                                 resourceItem.appendChild(resourceTitle);
                                 resourceItem.appendChild(resourceContent);
@@ -152,8 +157,13 @@ async function handleQuery(event) {
                     } else if (data.type === 'chunk' && answerElement) {
                         // 处理回答片段
                         answerContent += data.content;
-                        // 使用 marked 库渲染 Markdown
-                        answerElement.innerHTML = marked.parse(answerContent);
+                        // 使用 Markdown
+                        async () => { answerElement.innerHTML = await marked.parse(answerContent) };   
+                        const asyncParse = new Promise((resolve) => {
+                            resolve(marked.parse(answerContent));
+                        });
+                        
+                        answerElement.innerHTML = await asyncParse;
                     } else if (data.type === 'end') {
                         // 处理结束信号
                         console.log('流式响应结束');

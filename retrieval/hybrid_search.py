@@ -31,7 +31,7 @@ class HybridSearch:
         try:
             # 1. 执行Milvus向量检索
             print(f"执行Milvus向量检索，limit: {limit}")
-            vector_results = self.mv_store.search(query_embedding, limit=limit)
+            vector_results = self.mv_store.retrieval(query_embedding, limit=limit)
             print(f"Milvus向量检索完成，结果数量: {len(vector_results)}")
             
             # 2. 执行Elasticsearch BM25检索
@@ -40,9 +40,7 @@ class HybridSearch:
             print(f"Elasticsearch BM25检索完成，结果数量: {len(es_results)}")
             
             # 3. 融合搜索结果（使用RRF算法）
-            print(f"融合搜索结果，k: {k}")
             fused_results = self._rrf_fusion(vector_results, es_results, k=k, limit=limit)
-            print(f"结果融合完成，结果数量: {len(fused_results)}")
             
             return fused_results
         except Exception as e:
@@ -65,46 +63,58 @@ class HybridSearch:
         """
         # 构建文档得分映射
         rrf_scores = {}
-        
+        # print(f"vector_results: {vector_results}")
         # 处理Milvus向量检索结果
         for rank, result in enumerate(vector_results, 1):
             chunk_id = result.get("chunk_id")
             doc_id = result.get("doc_id")
-            if chunk_id and doc_id:
+            if chunk_id is not None and doc_id is not None:
+                # 确保chunk_id是字符串
+                chunk_id_str = str(chunk_id)
+                doc_id_str = str(doc_id)
                 score = 1.0 / (k + rank)
-                if doc_id+'_'+chunk_id not in rrf_scores:
-                    rrf_scores[doc_id+'_'+chunk_id] = 0
-                rrf_scores[doc_id+'_'+chunk_id] += score
-        
+                key = f"{doc_id_str}_{chunk_id_str}"
+                if key not in rrf_scores:
+                    rrf_scores[key] = 0
+                rrf_scores[key] += score
         # 处理Elasticsearch BM25检索结果
         for rank, result in enumerate(es_results, 1):
             chunk_id = result.get("chunk_id")
             doc_id = result.get("doc_id")
-            if chunk_id and doc_id:
+            if chunk_id is not None and doc_id is not None:
+                # 确保chunk_id是字符串
+                chunk_id_str = str(chunk_id)
+                doc_id_str = str(doc_id)
                 score = 1.0 / (k + rank)
-                if doc_id+'_'+chunk_id not in rrf_scores:
-                    rrf_scores[doc_id+'_'+chunk_id] = 0
-                rrf_scores[doc_id+'_'+chunk_id] += score
-        
+                key = f"{doc_id_str}_{chunk_id_str}"
+                if key not in rrf_scores:
+                    rrf_scores[key] = 0
+                rrf_scores[key] += score
         # 按得分排序
         sorted_chunks = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
         
         # 构建最终结果
         fused_results = []
         for key_id, score in sorted_chunks:
-            doc_id, chunk_id = key_id.split("_")
+            # 从右侧分割，只分割一次，避免doc_id或chunk_id中包含"_"的情况
+            parts = key_id.rsplit("_", 1)
+            if len(parts) == 2:
+                doc_id, chunk_id = parts
+            else:
+                # 如果分割失败，跳过这个结果
+                continue
 
             # 从原始结果中获取文档信息
             chunk_info = None
             # 先从Milvus结果中查找
             for result in vector_results:
-                if result.get("chunk_id") == chunk_id and result.get("doc_id") == doc_id:
+                if str(result.get('chunk_id')) == chunk_id and str(result.get('doc_id')) == doc_id:
                     chunk_info = result.copy()
                     break
             # 如果Milvus中没有，从ES结果中查找
             if not chunk_info:
                 for result in es_results:
-                    if result.get("chunk_id") == chunk_id and result.get("doc_id") == doc_id:
+                    if str(result.get('chunk_id')) == chunk_id and str(result.get('doc_id')) == doc_id:
                         chunk_info = result.copy()
                         break
             # 如果找到了文档信息，更新得分

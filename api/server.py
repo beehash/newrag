@@ -15,7 +15,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入配置
-from config import MILVUS_CONFIG, LLM_CONFIG, OLLAMA_CONFIG, SERVER_CONFIG, FILE_TYPES, SEARCH_CONFIG
+from config import MILVUS_CONFIG, LLM_CONFIG, ZHIPU_CONFIG, SERVER_CONFIG, FILE_TYPES, SEARCH_CONFIG
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,9 +24,10 @@ import json
 from ingestion.chunker import chunk_text
 from ingestion.embedding import EmbeddingService
 from ingestion.mv_store import MVStore
+from ingestion.es_store import ESStore
 from pipline.query_rewrite import QueryRewriter
 from pipline.rerank import Reranker
-from pipline.context_compress import ContextCompressor
+# from pipline.context_compress import ContextCompressor
 from retrieval.hybrid_search import HybridSearch
 from llm.client import LLMClient
 
@@ -53,6 +54,9 @@ async def test():
 # 全局MVStore实例
 mv_store = None
 
+# 全局ESStore实例
+es_store = None
+
 # 全局EmbeddingService实例
 embedding_service = None
 
@@ -63,7 +67,7 @@ rewriter = None
 reranker = None
 
 # 全局上下文压缩器实例
-compressor = None
+# compressor = None
 
 # 全局LLM客户端实例
 llm_client = None
@@ -80,7 +84,7 @@ def init_db():
     """
     初始化数据库连接
     """
-    global mv_store, embedding_service
+    global mv_store, embedding_service, es_store
     print("正在连接Milvus数据库...")
     try:
         # 连接数据库
@@ -100,11 +104,21 @@ def init_db():
         if mv_store.client is None:
             raise Exception("Milvus客户端初始化失败")
         
-        print("数据库连接成功！")
+        print("Milvus数据库连接成功！")
     except Exception as e:
-        print(f"数据库连接失败: {str(e)}")
+        print(f"Milvus数据库连接失败: {str(e)}")
         print("服务将在无数据库连接的情况下启动，部分功能可能不可用")
         mv_store = None
+    
+    # 初始化Elasticsearch连接
+    print("正在连接Elasticsearch数据库...")
+    try:
+        es_store = ESStore()
+        print("Elasticsearch数据库连接成功！")
+    except Exception as e:
+        print(f"Elasticsearch数据库连接失败: {str(e)}")
+        print("服务将在无Elasticsearch连接的情况下启动，部分功能可能不可用")
+        es_store = None
     
     # 初始化Embedding服务（在后台线程中运行）
     print("正在初始化Embedding服务...")
@@ -130,13 +144,16 @@ def init_components():
     """
     预加载所有模型和组件
     """
-    global rewriter, reranker, compressor, llm_client
+    global rewriter, reranker, llm_client
     
     print("正在预加载模型和组件...")
     
     # 初始化查询改写器
     try:
-        rewriter = QueryRewriter(ollama_url=OLLAMA_CONFIG["url"])
+        rewriter = QueryRewriter(
+            api_key=ZHIPU_CONFIG["api_key"],
+            base_url=ZHIPU_CONFIG["base_url"]
+        )
         print("查询改写器初始化成功！")
     except Exception as e:
         print(f"查询改写器初始化失败: {str(e)}")
@@ -148,12 +165,12 @@ def init_components():
     except Exception as e:
         print(f"重排序器初始化失败: {str(e)}")
     
-    # 初始化上下文压缩器
-    try:
-        compressor = ContextCompressor()
-        print("上下文压缩器初始化成功！")
-    except Exception as e:
-        print(f"上下文压缩器初始化失败: {str(e)}")
+    # # 初始化上下文压缩器
+    # try:
+    #     compressor = ContextCompressor()
+    #     print("上下文压缩器初始化成功！")
+    # except Exception as e:
+    #     print(f"上下文压缩器初始化失败: {str(e)}")
     
     # 初始化LLM客户端
     try:
@@ -164,15 +181,6 @@ def init_components():
         print("LLM客户端初始化成功！")
     except Exception as e:
         print(f"LLM客户端初始化失败: {str(e)}")
-    
-    # 初始化BM25模型
-    try:
-        if mv_store is not None:
-            mv_store.update_bm25_model()
-        else:
-            print("MVStore未初始化，跳过BM25模型初始化")
-    except Exception as e:
-        print(f"BM25模型初始化失败: {str(e)}")
     
     print("模型和组件预加载完成！")
 
@@ -265,15 +273,47 @@ async def upload_file(file: UploadFile = File(...)):
             "create_at": datetime.now().isoformat()
         })
     
-    # 尝试插入数据到数据库
+    # 尝试插入数据到Milvus数据库
     if mv_store is not None:
         try:
             mv_store.insert(documents_for_db)
-            print(f"文件 {file.filename} 成功插入到数据库")
+            print(f"文件 {file.filename} 成功插入到Milvus数据库")
         except Exception as e:
-            print(f"插入数据库失败: {str(e)}")
+            print(f"插入Milvus数据库失败: {str(e)}")
     else:
-        print("数据库连接未初始化，跳过数据库插入")
+        print("Milvus数据库连接未初始化，跳过数据库插入")
+    
+    # 尝试插入数据到Elasticsearch数据库
+    if es_store is not None:
+        try:
+            # 准备Elasticsearch数据
+            es_documents = []
+            for doc in documents_for_db:
+                es_documents.append({
+                    "chunk_id": doc["chunk_id"],
+                    "doc_id": doc["doc_id"],
+                    "text": doc["text"],
+                    "filename": doc["filename"],
+                    "title": doc["title"],
+                    "create_at": doc["create_at"],
+                    "type": doc["type"]
+                })
+            
+            # 异步插入数据
+            await es_store.add(es_documents)
+            print(f"文件 {file.filename} 成功插入到Elasticsearch数据库，共 {len(es_documents)} 条记录")
+        except Exception as e:
+            print(f"插入Elasticsearch数据库失败: {str(e)}")
+            # 如果Elasticsearch插入失败，删除已插入到Milvus的数据
+            if mv_store is not None:
+                print(f"回滚: 删除Milvus中的数据，doc_id: {doc_id}")
+                try:
+                    mv_store.deleteDocument(doc_id)
+                    print("已成功回滚Milvus中的数据")
+                except Exception as rollback_error:
+                    print(f"回滚Milvus数据失败: {str(rollback_error)}")
+    else:
+        print("Elasticsearch数据库连接未初始化，跳过数据库插入")
     
     # 返回结果
     return {
@@ -392,14 +432,28 @@ async def get_doc(doc_id: str):
 @api_router.delete("/doc/{doc_id}")
 async def delete_doc(doc_id: str):
     """删除文档"""
-    # 使用全局MVStore实例
-    global mv_store
+    # 使用全局MVStore和ESStore实例
+    global mv_store, es_store
     if mv_store is None:
         print("数据库连接未初始化，返回失败")
         return {"success": False}
     try:
+        # 删除Milvus中的数据
         success = mv_store.deleteDocument(doc_id)
-        return {"success": success}
+        if not success:
+            print("删除Milvus数据失败")
+            return {"success": False}
+        
+        # 删除Elasticsearch中的数据
+        if es_store is not None:
+            try:
+                await es_store.delete_by_doc_id(doc_id)
+                print(f"成功删除Elasticsearch中doc_id为 {doc_id} 的数据")
+            except Exception as e:
+                print(f"删除Elasticsearch数据失败: {str(e)}")
+                # 即使Elasticsearch删除失败，也返回成功，因为Milvus已经删除了
+        
+        return {"success": True}
     except Exception as e:
         print(f"删除文档失败: {str(e)}")
         return {"success": False}
@@ -423,7 +477,7 @@ async def query(request: dict):
         topk = min(max(topk, 1), 10)
         
         # 使用全局MVStore实例
-        global mv_store, rewriter, reranker, compressor, llm_client
+        global mv_store, rewriter, reranker, llm_client
         if mv_store is None:
             print("数据库连接未初始化，尝试重新连接...")
             init_db()
@@ -436,14 +490,17 @@ async def query(request: dict):
         # 步骤1: 执行查询改写和意图识别
         step1_start = time.time()
         if rewriter is None:
-            rewriter = QueryRewriter(ollama_url=OLLAMA_CONFIG["url"])
+            rewriter = QueryRewriter(
+                api_key=ZHIPU_CONFIG["api_key"],
+                base_url=ZHIPU_CONFIG["base_url"]
+            )
         
         # 执行意图识别
-        intent_result = rewriter.recognize_intent(q, model=OLLAMA_CONFIG["intent_model"])
+        intent_result = rewriter.recognize_intent(q, model=ZHIPU_CONFIG["intent_model"])
         print(f"意图识别结果: {intent_result}")
         
         # 生成1个改写查询
-        rewritten_queries = rewriter.rewrite_query(q, model=OLLAMA_CONFIG["rewrite_model"], num_rewrites=1)
+        rewritten_queries = rewriter.rewrite_query(q, model=ZHIPU_CONFIG["rewrite_model"], num_rewrites=1)
         # 构建查询列表：原始查询 + 改写查询
         all_queries = [q] + rewritten_queries
         all_queries = list(set(all_queries))  # 去重
@@ -474,12 +531,14 @@ async def query(request: dict):
                 "title": result.get("title"),
                 "filename": result.get("filename"),
                 "create_at": result.get("create_at"),
-                "similarity": result.get("score", 0)
+                "similarity": result.get("similarity"),
+                "_similarity": result.get("_similarity"),
+                "score": result.get("score", 0)
             }
             resources.append(resource)
         
         # 按相似度排序并限制数量
-        resources.sort(key=lambda x: x["similarity"], reverse=True)
+        resources.sort(key=lambda x: x["score"], reverse=True)
         resources = resources[:topk]
         print(f"步骤3完成（处理搜索结果）: {time.time() - step3_start:.2f}s")
         
@@ -492,18 +551,18 @@ async def query(request: dict):
         reranked_resources = reranker.rerank(q, rerank_candidates, top_k=topk)
         print(f"步骤4完成（重排序）: {time.time() - step4_start:.2f}s")
         
-        # 步骤5: 上下文压缩（使用预加载的compressor）
-        step5_start = time.time()
-        if compressor is None:
-            compressor = ContextCompressor()
-        # 压缩上下文，减少大模型输入长度
-        compressed_resources = compressor.compress(q, reranked_resources, top_k=topk)
-        print(f"步骤5完成（上下文压缩）: {time.time() - step5_start:.2f}s")
+        # # 步骤5: 上下文压缩（使用预加载的compressor）
+        # step5_start = time.time()
+        # if compressor is None:
+        #     compressor = ContextCompressor()
+        # # 压缩上下文，减少大模型输入长度
+        # compressed_resources = compressor.compress(q, reranked_resources, top_k=topk)
+        # print(f"步骤5完成（上下文压缩）: {time.time() - step5_start:.2f}s")
         
         # 步骤6: 构建context
         step6_start = time.time()
         context = ""
-        for i, doc in enumerate(compressed_resources):
+        for i, doc in enumerate(reranked_resources):
             context += f"来源 {i+1}: {doc.get('text', '')}\n\n"
         print(f"步骤6完成（构建context）: {time.time() - step6_start:.2f}s")
         
@@ -525,12 +584,12 @@ async def query(request: dict):
             init_data = {
                 "type": "init",
                 "intent": intent_result,
-                "resources": compressed_resources
+                "resources": reranked_resources
             }
             yield f"data: {json.dumps(init_data)}\n\n"
             
-            # 流式获取大模型回复
-            for chunk in llm_client.generate_response_stream(context, q):
+            # 异步流式获取大模型回复
+            async for chunk in llm_client.generate_response_stream(context, q):
                 chunk_data = {
                     "type": "chunk",
                     "content": chunk
@@ -557,7 +616,10 @@ async def query_rewrite(request: dict):
             raise HTTPException(status_code=400, detail="查询内容不能为空")
         
         # 初始化查询改写器
-        rewriter = QueryRewriter(ollama_url=OLLAMA_CONFIG["url"])
+        rewriter = QueryRewriter(
+            api_key=ZHIPU_CONFIG["api_key"],
+            base_url=ZHIPU_CONFIG["base_url"]
+        )
         
         # 生成改写查询
         rewritten_queries = rewriter.rewrite_query(q)

@@ -56,23 +56,33 @@ class ESStore:
         """
         try:
             if not await self.client.indices.exists(index=self.index_name):
-                # 创建索引
+                # 创建索引 - 使用Elasticsearch 8.x API格式
                 await self.client.indices.create(
                     index=self.index_name,
-                    body={
-                        "mappings": {
-                            "properties": {
-                                "chunk_id": {
-                                    "type": "keyword"
-                                },
-                                "doc_id": {
-                                    "type": "keyword"
-                                },
-                                "text": {
-                                    "type": "text",
-                                    "analyzer": "ik_max_word",
-                                    "search_analyzer": "ik_smart"
-                                }
+                    mappings={
+                        "properties": {
+                            "chunk_id": {
+                                "type": "keyword"
+                            },
+                            "doc_id": {
+                                "type": "keyword"
+                            },
+                            "text": {
+                                "type": "text",
+                                "analyzer": "ik_max_word",
+                                "search_analyzer": "ik_smart"
+                            },
+                            "filename": {
+                                "type": "keyword"
+                            },
+                            "title": {
+                                "type": "keyword"
+                            },
+                            "create_at": {
+                                "type": "keyword"
+                            },
+                            "type": {
+                                "type": "keyword"
                             }
                         }
                     }
@@ -103,24 +113,24 @@ class ESStore:
                     return False
             
             if isinstance(data, list):
-                # 批量添加
+                # 批量添加 - 使用Elasticsearch 8.x API格式
                 for item in data:
                     chunk_id = item.get("chunk_id")
                     if chunk_id:
                         await self.client.index(
                             index=self.index_name,
                             id=chunk_id,
-                            body=item
+                            document=item
                         )
                 print(f"批量添加 {len(data)} 条数据成功")
             else:
-                # 单个添加
+                # 单个添加 - 使用Elasticsearch 8.x API格式
                 chunk_id = data.get("chunk_id")
                 if chunk_id:
                     await self.client.index(
                         index=self.index_name,
                         id=chunk_id,
-                        body=data
+                        document=data
                     )
                     print(f"添加数据成功，chunk_id: {chunk_id}")
                 else:
@@ -149,10 +159,7 @@ class ESStore:
                     print("客户端未初始化")
                     return False
             
-            await self.client.delete(
-                index=self.index_name,
-                id=chunk_id
-            )
+            await self.client.delete(index=self.index_name, id=chunk_id)
             print(f"删除数据成功，chunk_id: {chunk_id}")
             return True
         except Exception as e:
@@ -176,14 +183,12 @@ class ESStore:
                     print("客户端未初始化")
                     return False
             
-            # 使用Delete By Query API删除所有匹配doc_id的文档
+            # 使用Delete By Query API删除所有匹配doc_id的文档 - 使用Elasticsearch 8.x API格式
             await self.client.delete_by_query(
                 index=self.index_name,
-                body={
-                    "query": {
-                        "term": {
-                            "doc_id": doc_id
-                        }
+                query={
+                    "term": {
+                        "doc_id": doc_id
                     }
                 }
             )
@@ -211,18 +216,16 @@ class ESStore:
                     print("客户端未初始化")
                     return []
             
-            # 使用match查询
+            # 使用match查询 - 使用Elasticsearch 8.x API格式
             search_result = await self.client.search(
                 index=self.index_name,
-                body={
-                    "query": {
-                        "match": {
-                            "text": query
-                        }
-                    },
-                    "size": limit,
-                    "_source": ["chunk_id", "doc_id", "text"]
-                }
+                query={
+                    "match": {
+                        "text": query
+                    }
+                },
+                size=limit,
+                source=["chunk_id", "doc_id", "text", "filename", "title", "create_at", "type"]
             )
             
             # 处理检索结果
@@ -234,9 +237,13 @@ class ESStore:
                     "chunk_id": source.get("chunk_id"),
                     "doc_id": source.get("doc_id"),
                     "text": source.get("text"),
-                    "score": score
+                    "filename": source.get("filename"),
+                    "title": source.get("title"),
+                    "create_at": source.get("create_at"),
+                    "type": source.get("type"),
+                    "_similarity": score
                 })
-            
+                
             print(f"检索完成，返回 {len(results)} 个结果")
             return results
         except Exception as e:
@@ -247,38 +254,6 @@ class ESStore:
         """
         关闭Elasticsearch连接
         """
-        try:
-            if self.client:
-                await self.client.close()
-                print("Elasticsearch连接已关闭")
-        except Exception as e:
-            print(f"关闭连接时出错: {str(e)}")
-
-
-# 测试代码
-import asyncio
-
-async def test_es_store():
-    es_store = ESStore()
-    await es_store._connect()
-    
-    # 测试添加数据
-    test_data = {
-        "chunk_id": "test_chunk_1",
-        "doc_id": "test_doc_1",
-        "text": "这是测试内容，Elasticsearch是一个分布式搜索引擎"
-    }
-    await es_store.add(test_data)
-    
-    # 测试检索
-    results = await es_store.retrieve("Elasticsearch")
-    print("检索结果:", results)
-    
-    # 测试删除
-    await es_store.delete("test_chunk_1")
-    
-    # 关闭连接
-    await es_store.close()
-
-if __name__ == "__main__":
-    asyncio.run(test_es_store())
+        if self.client:
+            await self.client.close()
+            print("Elasticsearch连接已关闭")

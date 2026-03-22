@@ -3,19 +3,25 @@ import requests
 
 class QueryRewriter:
     """
-    查询改写类，使用ollama-qwen3:8b模型生成多个查询语句
+    查询改写类，使用智谱AI的ChatGLM3-6B模型生成多个查询语句
     """
     
-    def __init__(self, ollama_url="http://localhost:11434/api/generate"):
+    def __init__(self, api_key="", base_url="https://open.bigmodel.cn/api/paas/v4"):
         """
         初始化查询改写器
         
         Args:
-            ollama_url: ollama API地址
+            api_key: 智谱AI API密钥
+            base_url: 智谱AI API基础URL
         """
-        self.ollama_url = ollama_url
+        self.api_key = api_key
+        self.base_url = base_url
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
     
-    def rewrite_query(self, query, model="qwen2.5:7b", num_rewrites=3):
+    def rewrite_query(self, query, model="glm-3-flash", num_rewrites=3):
         """
         改写查询语句
         
@@ -35,50 +41,60 @@ class QueryRewriter:
 要求：
 - 保持原意
 - 使用不同表达方式
-- 输出 JSON list
+- 输出 JSON list 格式，例如：["问题1", "问题2", "问题3"]
 
 用户问题：
 {query}
 """
         
-        # 发送请求到ollama
+        # 发送请求到智谱AI
         payload = {
             "model": model,
-            "prompt": prompt,
-            "format": "json",
-            "stream": False
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.7,
+            "max_tokens": 500
         }
         
         try:
-            print(f"发送请求到Ollama: {self.ollama_url}")
-            print(f"请求参数: {payload}")
-            response = requests.post(self.ollama_url, json=payload, timeout=30)
+            print(f"发送请求到智谱AI: {self.base_url}/chat/completions")
+            print(f"请求模型: {model}")
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=self.headers,
+                json=payload,
+                timeout=30
+            )
             print(f"响应状态码: {response.status_code}")
-            print(f"响应内容: {response.text}")
             response.raise_for_status()
             
             # 解析响应
             result = response.json()
-            rewritten_queries = json.loads(result.get("response", "[]"))
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
             
-            # 确保返回的是列表且长度正确
-            if isinstance(rewritten_queries, dict) and "questions" in rewritten_queries:
-                # 如果是字典且包含 questions 字段，返回 questions 列表
-                if isinstance(rewritten_queries["questions"], list):
-                    return rewritten_queries["questions"][:num_rewrites]
+            # 尝试解析JSON
+            try:
+                rewritten_queries = json.loads(content)
+                
+                # 确保返回的是列表
+                if isinstance(rewritten_queries, list):
+                    return rewritten_queries[:num_rewrites]
                 else:
                     return [query]
-            elif isinstance(rewritten_queries, list):
-                # 如果是列表，直接返回
-                return rewritten_queries[:num_rewrites]
-            else:
+            except json.JSONDecodeError:
+                # 如果解析失败，返回原始查询
+                print(f"JSON解析失败，返回原始查询: {content}")
                 return [query]
         except Exception as e:
             print(f"查询改写失败: {e}")
             # 失败时返回原始查询
             return [query]
     
-    def recognize_intent(self, query, model="qwen2.5:7b"):
+    def recognize_intent(self, query, model="glm-3-flash"):
         """
         识别查询意图
         
@@ -109,30 +125,52 @@ class QueryRewriter:
 {query}
 """
         
-        # 发送请求到ollama
+        # 发送请求到智谱AI
         payload = {
             "model": model,
-            "prompt": prompt,
-            "format": "json",
-            "stream": False
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.3,
+            "max_tokens": 500
         }
         
         try:
-            print(f"发送请求到Ollama: {self.ollama_url}")
-            print(f"请求参数: {payload}")
-            response = requests.post(self.ollama_url, json=payload, timeout=30)
+            print(f"发送请求到智谱AI: {self.base_url}/chat/completions")
+            print(f"请求模型: {model}")
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=self.headers,
+                json=payload,
+                timeout=30
+            )
             print(f"响应状态码: {response.status_code}")
-            print(f"响应内容: {response.text}")
             response.raise_for_status()
             
             # 解析响应
             result = response.json()
-            intent_result = json.loads(result.get("response", "{}"))
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
             
-            # 确保返回的是字典
-            if isinstance(intent_result, dict):
-                return intent_result
-            else:
+            # 尝试解析JSON
+            try:
+                intent_result = json.loads(content)
+                
+                # 确保返回的是字典
+                if isinstance(intent_result, dict):
+                    return intent_result
+                else:
+                    return {
+                        "intent": "其他",
+                        "confidence": 0.5,
+                        "keywords": [query],
+                        "summary": query
+                    }
+            except json.JSONDecodeError:
+                # 如果解析失败，返回默认值
+                print(f"JSON解析失败，返回默认值: {content}")
                 return {
                     "intent": "其他",
                     "confidence": 0.5,
@@ -162,4 +200,3 @@ if __name__ == "__main__":
     # 测试意图识别
     intent_result = rewriter.recognize_intent(test_query)
     print("意图识别结果:", intent_result)
-

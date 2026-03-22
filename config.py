@@ -24,16 +24,17 @@ RERANK_CONFIG = {
 
 # 大模型配置
 LLM_CONFIG = {
-    "model_name": "qwen-turbo",  # 使用的大模型名称
+    "model_name": "qwen3-235b-a22b-instruct-2507",  # 使用的大模型名称
     "api_key": "sk-54a9eaf0c047451d888a2387a1cd25d9",  # 大模型API密钥
     "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"  # 大模型API基础URL
 }
 
-# Ollama配置（用于查询改写和意图识别）
-OLLAMA_CONFIG = {
-    "url": "http://127.0.0.1:11434/api/generate",  # Ollama API地址
-    "rewrite_model": "qwen2.5:1.5b",  # 用于查询改写的模型
-    "intent_model": "qwen2.5:1.5b"  # 用于意图识别的模型
+# 智谱AI配置（用于查询改写和意图识别）
+ZHIPU_CONFIG = {
+    "api_key": "",  # 智谱AI API密钥
+    "base_url": "https://open.bigmodel.cn/api/paas/v4",  # 智谱AI API基础URL
+    "rewrite_model": "glm-3-turbo",  # 用于查询改写的模型（ChatGLM3-6B开源模型）
+    "intent_model": "glm-3-turbo"  # 用于意图识别的模型（ChatGLM3-6B开源模型）
 }
 
 # 服务器配置

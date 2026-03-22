@@ -92,7 +92,7 @@ class MVStore:
             index_params = {
                 "metric_type": "IP",
                 "index_type": "HNSW",
-                "params": {"M": 16, "nprobe": 16}
+                "params": {"M": 16, "efConstruction": 100}
             }
             collection.create_index(field_name="vector", index_params=index_params)
             
@@ -301,7 +301,7 @@ class MVStore:
             print(f"插入数据失败: {str(e)}")
             return []
     
-    def retireval(self, query_embedding, limit=10):
+    def retrieval(self, query_embedding, limit=10):
         """
         搜索相似向量
         
@@ -322,7 +322,7 @@ class MVStore:
         # 搜索参数 - 与用户提供的示例保持一致
         search_params = {
             "metric_type": "IP",
-            "params": {"nlist": 128}
+            "params": {"ef": 64}
         }
         
         results = self.client.search(
@@ -337,14 +337,16 @@ class MVStore:
         # 处理搜索结果，添加score字段
         docs = []
         for hit in results[0]:
-            docs.append({
-                "doc_id": hit.entity.get('doc_id'),
-                "chunk_id": hit.entity.get('chunk_id'),
-                "filename": hit.entity.get('filename'),
-                "title": hit.entity.get('title'),
-                "text": hit.entity.get('text'),
-                "create_at": hit.entity.get('create_at'),
-                "score": hit.distance  # 余弦相似度
-            })
+            doc = {
+                "doc_id": hit.get('entity').get('doc_id'),
+                "chunk_id": hit.get('entity').get('chunk_id'),
+                "filename": hit.get('entity').get('filename'),
+                "title": hit.get('entity').get('title'),
+                "text": hit.get('entity').get('text'),
+                "create_at": hit.get('entity').get('create_at'),
+                "similarity": hit.get('distance', hit.get('score', 0))  # 尝试获取distance或score
+            }     
+            docs.append(doc)
+        print(f"Milvus hit文档数量: {len(docs)}")
         
         return docs
