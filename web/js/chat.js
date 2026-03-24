@@ -100,7 +100,7 @@ async function handleQuery(event) {
                                 <h3>意图分析</h3>
                                 <p><strong>意图类别:</strong> ${intentData.intent || '未知'}</p>
                                 <p><strong>置信度:</strong> ${Math.round((intentData.confidence || 0) * 100)}%</p>
-                                <p><strong>关键词:</strong> ${(intentData.keywords || []).join(', ')}</p>
+                                <p><strong>实体词:</strong> ${(intentData.entities || []).join(', ')}</p>
                                 <p><strong>问题摘要:</strong> ${intentData.summary || ''}</p>
                             `;
                             chatResult.appendChild(intentSection);
@@ -195,7 +195,7 @@ function displayResult(data) {
             <h3>意图分析</h3>
             <p><strong>意图类别:</strong> ${data.intent.intent || '未知'}</p>
             <p><strong>置信度:</strong> ${Math.round((data.intent.confidence || 0) * 100)}%</p>
-            <p><strong>关键词:</strong> ${(data.intent.keywords || []).join(', ')}</p>
+            <p><strong>关键词:</strong> ${(data.intent.entities || []).join(', ')}</p>
             <p><strong>问题摘要:</strong> ${data.intent.summary || ''}</p>
         `;
         chatResult.appendChild(intentSection);

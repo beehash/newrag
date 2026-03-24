@@ -198,13 +198,13 @@ class ESStore:
             print(f"删除数据时出错: {str(e)}")
             return False
     
-    async def retrieval(self, query, limit=10):
+    async def retrieval(self, query, entities=None, limit=10):
         """
-        使用match模式检索数据
+        使用match模式检索数据，支持实体词boost
         
         Args:
             query: 查询文本
-            limit: 返回结果数量
+            entities: 实体词列表，用于boost
             
         Returns:
             list: 检索结果列表
@@ -216,14 +216,49 @@ class ESStore:
                     print("客户端未初始化")
                     return []
             
-            # 使用match查询 - 使用Elasticsearch 8.x API格式
+            # 构建查询
+            if entities and len(entities) > 0:
+                # 使用bool查询组合match查询和boost查询
+                query_body = {
+                    "bool": {
+                        "should": [
+                            # 主查询
+                            {
+                                "match": {
+                                    "text": {
+                                        "query": query
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+                
+                # 为每个实体词添加boost查询
+                for entity in entities:
+                    if entity and entity.strip():
+                        query_body["bool"]["should"].append({
+                            "match": {
+                                "text": {
+                                    "query": entity,
+                                    "boost": 3.0  # 实体词的boost值
+                                }
+                            }
+                        })
+            else:
+                # 简单的match查询
+                query_body = {
+                    "match": {
+                        "text": {
+                            "query": query
+                        }
+                    }
+                }
+            
+            # 执行搜索
             search_result = await self.client.search(
                 index=self.index_name,
-                query={
-                    "match": {
-                        "text": query
-                    }
-                },
+                query=query_body,
                 size=limit,
                 source=["chunk_id", "doc_id", "text", "filename", "title", "create_at", "type"]
             )

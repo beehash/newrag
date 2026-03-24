@@ -31,10 +31,10 @@ LLM_CONFIG = {
 
 # 智谱AI配置（用于查询改写和意图识别）
 ZHIPU_CONFIG = {
-    "api_key": "",  # 智谱AI API密钥
+    "api_key": "a972ccebf16843f4b3327316b8f650f4.SipzUpd1cLXDBOyT",  # 智谱AI API密钥
     "base_url": "https://open.bigmodel.cn/api/paas/v4",  # 智谱AI API基础URL
-    "rewrite_model": "glm-3-turbo",  # 用于查询改写的模型（ChatGLM3-6B开源模型）
-    "intent_model": "glm-3-turbo"  # 用于意图识别的模型（ChatGLM3-6B开源模型）
+    "rewrite_model": "glm-4-flash",  # 用于查询改写的模型
+    "intent_model": "glm-4-flash"  # 用于意图识别的模型
 }
 
 # 服务器配置

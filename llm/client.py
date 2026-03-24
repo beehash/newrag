@@ -23,12 +23,21 @@ class LLMClient:
         # 创建一个没有代理的 httpx 异步客户端，避免 proxies 参数错误
         http_client = httpx.AsyncClient(trust_env=False)
         
+        self.http_client = http_client
         self.client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
             http_client=http_client
         )
         print(f"大模型客户端初始化完成 {self.client}")  
+    
+    async def close(self):
+        """
+        关闭异步客户端，释放资源
+        """
+        if self.http_client:
+            await self.http_client.aclose()
+            print("大模型客户端已关闭")
     async def generate_response_stream(self, context, query):
         """
         生成大模型回复（异步流式）
@@ -40,21 +49,13 @@ class LLMClient:
         Yields:
             str: 大模型回复的每一个片段
         """
-        # 构建prompt
-        prompt = f"""你是一个专业的问答助手，请基于以下的上下文环境回答问题：{context}，用户的问题：{query}
-请注意：
-1. 只使用提供的文档内容回答问题，不要凭空编造信息。
-2. 如果文档中没有相关信息，请回答"文档中没有相关信息"。
-3. 回答尽量简明扼要，逻辑清晰。
-4. 如果涉及多个文档，请区分来源，并在必要时标注来源编号。
-
-请开始回答："""
+        # 构建messages
+        messages = [
+            {"role": "system", "content": "你是一个专业的问答助手，请基于以下的上下文环境回答问题，只使用提供的文档内容回答，不要凭空编造信息。如果文档中没有相关信息，请回答'文档中没有相关信息'。"},
+            {"role": "user", "content": f"上下文：{context}\n\n用户问题：{query}"}
+        ]
         
         try:
-            messages = [
-                {"role": "system", "content": "你是一个专业的问答助手，基于提供的上下文回答问题"},
-                {"role": "user", "content": prompt}
-            ]
             stream = await self.client.chat.completions.create(
                 model=LLM_CONFIG["model_name"],
                 messages=messages,

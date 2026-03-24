@@ -1,4 +1,7 @@
+import os
 from sentence_transformers import CrossEncoder
+
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
 class Reranker:
     """
@@ -36,7 +39,7 @@ class Reranker:
         print(f"步骤5开始2")
         for doc in documents:
             # 组合标题和内容作为文档文本
-            doc_text = f"{doc.get('title', '')} {doc.get('content', '')}"
+            doc_text = f"{doc.get('title', '')} {doc.get('text', '')}"
             text_pairs.append((query, doc_text))
         print(f"步骤5开始3")
         # 计算相关性分数
@@ -46,9 +49,10 @@ class Reranker:
         for i, doc in enumerate(documents):
             # 打印每个文档的分数
             doc["rerank_score"] = float(scores[i])
+            # print(f"处理后的资源: {doc.get('title', '')}  {doc.get('rerank_score', 0)}")
         print(f"步骤5开始4")
         # 按分数排序
         documents.sort(key=lambda x: x["rerank_score"], reverse=True)
         print(f"步骤5开始5")
         # 返回前top_k个结果
-        return documents[:top_k]
+        return documents

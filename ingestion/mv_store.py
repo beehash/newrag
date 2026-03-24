@@ -307,7 +307,6 @@ class MVStore:
         
         Args:
             query_embedding: 查询向量
-            limit: 返回结果数量
             
         Returns:
             list: 搜索结果
@@ -347,6 +346,7 @@ class MVStore:
                 "similarity": hit.get('distance', hit.get('score', 0))  # 尝试获取distance或score
             }     
             docs.append(doc)
+            print(f"title: {doc.get('title', '')} {doc.get('similarity', 0)}")
         print(f"Milvus hit文档数量: {len(docs)}")
         
         return docs

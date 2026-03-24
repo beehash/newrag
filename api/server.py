@@ -20,6 +20,7 @@ from config import MILVUS_CONFIG, LLM_CONFIG, ZHIPU_CONFIG, SERVER_CONFIG, FILE_
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from contextlib import asynccontextmanager
 import json
 from ingestion.chunker import chunk_text
 from ingestion.embedding import EmbeddingService
@@ -31,7 +32,21 @@ from pipline.rerank import Reranker
 from retrieval.hybrid_search import HybridSearch
 from llm.client import LLMClient
 
-app = FastAPI()
+# 生命周期事件处理器
+@asynccontextmanager
+async def lifespan(app):
+    """
+    应用生命周期管理
+    """
+    # 启动时的初始化工作
+    yield
+    # 关闭时的清理工作
+    global llm_client
+    if llm_client:
+        await llm_client.close()
+        print("LLM客户端已关闭")
+
+app = FastAPI(lifespan=lifespan)
 
 # 配置CORS
 app.add_middleware(
@@ -122,22 +137,18 @@ def init_db():
     
     # 初始化Embedding服务（在后台线程中运行）
     print("正在初始化Embedding服务...")
-    def init_embedding_service():
-        global embedding_service
-        try:
-            embedding_service = EmbeddingService()
-            print("Embedding服务初始化成功！")
-        except Exception as e:
-            print(f"Embedding服务初始化失败: {str(e)}")
-            print("服务将在无Embedding服务的情况下启动，部分功能可能不可用")
-    
-    # 在后台线程中初始化Embedding服务
-    embedding_thread = threading.Thread(target=init_embedding_service)
-    embedding_thread.daemon = True
-    embedding_thread.start()
-
 # 初始化数据库连接
 init_db()
+
+# 初始化Embedding服务
+def init_embedding_service():
+    global embedding_service
+    try:
+        embedding_service = EmbeddingService()
+        print("Embedding服务初始化成功！")
+    except Exception as e:
+        print(f"Embedding服务初始化失败: {str(e)}")
+        print("服务将在无Embedding服务的情况下启动，部分功能可能不可用")
 
 # 预加载所有模型和组件
 def init_components():
@@ -184,10 +195,11 @@ def init_components():
     
     print("模型和组件预加载完成！")
 
-# 在后台线程中预加载组件
-components_thread = threading.Thread(target=init_components)
-components_thread.daemon = True
-components_thread.start()
+# 同步初始化所有服务
+print("正在初始化Embedding服务...")
+init_embedding_service()
+print("正在预加载模型和组件...")
+init_components()
 
 # 上传文件保存目录
 UPLOAD_DIR = SERVER_CONFIG["upload_dir"]
@@ -495,39 +507,50 @@ async def query(request: dict):
                 base_url=ZHIPU_CONFIG["base_url"]
             )
         
-        # 执行意图识别
-        intent_result = rewriter.recognize_intent(q, model=ZHIPU_CONFIG["intent_model"])
+        # 执行综合查询分析（一次调用完成意图识别和查询改写）
+        analysis_result = rewriter.analyze_query(q, model=ZHIPU_CONFIG["intent_model"], num_rewrites=2)
+        intent_result = analysis_result.get("intent", {})
+        rewritten_queries = analysis_result.get("rewritten_queries", [])
         print(f"意图识别结果: {intent_result}")
+        print(f"改写查询: {rewritten_queries}")
         
-        # 生成1个改写查询
-        rewritten_queries = rewriter.rewrite_query(q, model=ZHIPU_CONFIG["rewrite_model"], num_rewrites=1)
         # 构建查询列表：原始查询 + 改写查询
-        all_queries = [q] + rewritten_queries
+        all_queries = intent_result.get('entities', []) + [q]+ rewritten_queries
         all_queries = list(set(all_queries))  # 去重
+        # all_queries = ';'.join(all_queries)
+        
         print(f"步骤1完成（查询改写+意图识别）: {time.time() - step1_start:.2f}s  {all_queries}")
         
         # 步骤2: 执行混合搜索
         step2_start = time.time()
         hybrid_search = HybridSearch(mv_store)
         # 只为原始查询生成embedding，减少计算
-        query_embedding = embedding_service.embed_text(q)
+        print(f"查询query embedding: {q + ' ' + ' '.join(intent_result.get('entities', []))}")
+        # 从意图识别结果中获取实体词
+        entities = intent_result.get('entities', [])
+        print(f"获取到的实体词: {entities}")
+        
         # 执行混合搜索
-        all_fused_results = []
+        all_results = []
         for query_text in all_queries:
-            # 对于所有查询，使用混合搜索
-            fused_results = await hybrid_search.search(query_text, query_embedding, limit=topk)
-            all_fused_results.extend(fused_results)
+            query_embedding = embedding_service.embed_text(query_text + ' ' + ' '.join(intent_result.get('entities', [])))
+            # 对于所有查询，使用混合搜索，传递实体词用于boost
+            search_results = await hybrid_search.search(query_text, query_embedding, limit=10, entities=entities)
+            all_results.extend(search_results["vector_results"])
+            all_results.extend(search_results["es_results"])
+            
         print(f"步骤2完成（混合搜索）: {time.time() - step2_start:.2f}s")
+        # 3. 融合搜索结果（使用RRF算法）
+        rrf_results = hybrid_search._rrf_fusion(all_results, k=60, limit=topk)
         
         # 步骤3: 处理搜索结果，只保留需要的字段
         step3_start = time.time()
         resources = []
-        for result in all_fused_results:
+        for result in rrf_results:
             # 只保留需要的字段
             resource = {
                 "doc_id": result.get("doc_id"),
                 "chunk_id": result.get("chunk_id"),
-                "text": result.get("text"),
                 "title": result.get("title"),
                 "filename": result.get("filename"),
                 "create_at": result.get("create_at"),
@@ -535,11 +558,12 @@ async def query(request: dict):
                 "_similarity": result.get("_similarity"),
                 "score": result.get("score", 0)
             }
+            
             resources.append(resource)
         
         # 按相似度排序并限制数量
         resources.sort(key=lambda x: x["score"], reverse=True)
-        resources = resources[:topk]
+        # resources = resources[:topk]
         print(f"步骤3完成（处理搜索结果）: {time.time() - step3_start:.2f}s")
         
         # 步骤4: 重排序（使用预加载的reranker，且只对前10个重排序）
@@ -634,5 +658,7 @@ async def query_rewrite(request: dict):
 # 挂载API路由
 app.include_router(api_router)
 
+
+
 if __name__ == "__main__":
-    uvicorn.run(app, host=SERVER_CONFIG["host"], port=SERVER_CONFIG["port"])
+    uvicorn.run("api.server:app", host=SERVER_CONFIG["host"], port=SERVER_CONFIG["port"], reload=True)
