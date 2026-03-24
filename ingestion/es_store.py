@@ -116,25 +116,31 @@ class ESStore:
                 # 批量添加 - 使用Elasticsearch 8.x API格式
                 for item in data:
                     chunk_id = item.get("chunk_id")
-                    if chunk_id:
+                    doc_id = item.get("doc_id")
+                    # 使用doc_id和chunk_id的组合作为唯一ID，避免不同文件的chunk_id重复导致覆盖
+                    unique_id = f"{doc_id}_{chunk_id}"
+                    if chunk_id and doc_id:
                         await self.client.index(
                             index=self.index_name,
-                            id=chunk_id,
+                            id=unique_id,
                             document=item
                         )
                 print(f"批量添加 {len(data)} 条数据成功")
             else:
                 # 单个添加 - 使用Elasticsearch 8.x API格式
                 chunk_id = data.get("chunk_id")
-                if chunk_id:
+                doc_id = data.get("doc_id")
+                # 使用doc_id和chunk_id的组合作为唯一ID
+                unique_id = f"{doc_id}_{chunk_id}"
+                if chunk_id and doc_id:
                     await self.client.index(
                         index=self.index_name,
-                        id=chunk_id,
+                        id=unique_id,
                         document=data
                     )
-                    print(f"添加数据成功，chunk_id: {chunk_id}")
+                    print(f"添加数据成功，ID: {unique_id}")
                 else:
-                    print("chunk_id不能为空")
+                    print("chunk_id和doc_id不能为空")
                     return False
             
             return True
